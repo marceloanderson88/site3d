@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
+import { useAuth } from '@/lib/auth-context'
 import { Layers, LogIn } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
@@ -14,19 +14,18 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const router = useRouter()
-  const supabase = createClient()
+  const { login } = useAuth()
   const { showToast } = useToast()
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    const { error } = await login(email, password)
     if (error) {
-      showToast(error.message === 'Invalid login credentials' ? 'Email ou senha incorretos.' : error.message, 'error')
+      showToast(error, 'error')
     } else {
       showToast('Login realizado com sucesso!')
       router.push('/')
-      router.refresh()
     }
     setLoading(false)
   }
@@ -46,38 +45,23 @@ export default function LoginPage() {
         </div>
 
         <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-8">
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4 text-xs text-blue-800">
+            <p className="font-semibold mb-1">Contas de demonstração:</p>
+            <p>👤 demo@3dlivre.com / 123456</p>
+            <p>🔧 admin@3dlivre.com / admin123</p>
+          </div>
+
           <form onSubmit={handleLogin} className="space-y-4">
-            <Input
-              id="email"
-              type="email"
-              label="Email"
-              placeholder="seu@email.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              autoComplete="email"
-            />
-            <Input
-              id="password"
-              type="password"
-              label="Senha"
-              placeholder="••••••••"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              autoComplete="current-password"
-            />
+            <Input id="email" type="email" label="Email" placeholder="seu@email.com" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email" />
+            <Input id="password" type="password" label="Senha" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} required autoComplete="current-password" />
             <Button type="submit" className="w-full" loading={loading} size="lg">
-              <LogIn size={16} />
-              Entrar
+              <LogIn size={16} />Entrar
             </Button>
           </form>
 
           <div className="mt-6 text-center text-sm text-gray-600">
             Não tem conta?{' '}
-            <Link href="/cadastro" className="text-blue-600 hover:text-blue-700 font-medium">
-              Cadastre-se gratuitamente
-            </Link>
+            <Link href="/cadastro" className="text-blue-600 hover:text-blue-700 font-medium">Cadastre-se gratuitamente</Link>
           </div>
         </div>
       </div>

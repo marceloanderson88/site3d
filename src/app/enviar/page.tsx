@@ -1,25 +1,27 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
+import { useAuth } from '@/lib/auth-context'
 import { Upload, X, Image as ImageIcon, File, CheckCircle } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 import Textarea from '@/components/ui/Textarea'
 import Select from '@/components/ui/Select'
 import { useToast } from '@/components/ui/Toast'
-import { CATEGORIES, LICENSES, MATERIALS, FILE_TYPES, slugify } from '@/lib/utils'
+import { CATEGORIES, LICENSES, MATERIALS } from '@/lib/utils'
 
-const ALLOWED_FILE_TYPES = ['.stl', '.obj', '.3mf', '.step', '.zip']
+const ALLOWED_FILE_EXTS = ['.stl', '.obj', '.3mf', '.step', '.zip']
 const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
-const MAX_FILE_SIZE = 100 * 1024 * 1024 // 100MB
-const MAX_IMAGE_SIZE = 10 * 1024 * 1024 // 10MB
 
 export default function EnviarPage() {
   const router = useRouter()
-  const supabase = createClient()
+  const { user, isLoading } = useAuth()
   const { showToast } = useToast()
+
+  useEffect(() => {
+    if (!isLoading && !user) router.push('/login')
+  }, [user, isLoading, router])
 
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
@@ -33,11 +35,9 @@ export default function EnviarPage() {
   const [supportsRequired, setSupportsRequired] = useState('')
   const [printerUsed, setPrinterUsed] = useState('')
   const [assemblyNotes, setAssemblyNotes] = useState('')
-
   const [modelFile, setModelFile] = useState<File | null>(null)
-  const [imageFiles, setImageFiles] = useState<File[]>([])
   const [imagePreviews, setImagePreviews] = useState<string[]>([])
-
+  const [imageFiles, setImageFiles] = useState<File[]>([])
   const [loading, setLoading] = useState(false)
   const [step, setStep] = useState<'form' | 'success'>('form')
 
@@ -48,22 +48,14 @@ export default function EnviarPage() {
     const file = e.target.files?.[0]
     if (!file) return
     const ext = '.' + file.name.split('.').pop()?.toLowerCase()
-    if (!ALLOWED_FILE_TYPES.includes(ext)) {
-      showToast(`Formato não permitido. Use: ${ALLOWED_FILE_TYPES.join(', ')}`, 'error')
-      return
-    }
-    if (file.size > MAX_FILE_SIZE) {
-      showToast('Arquivo muito grande. Máximo 100MB.', 'error')
-      return
-    }
+    if (!ALLOWED_FILE_EXTS.includes(ext)) { showToast(`Formato não permitido. Use: ${ALLOWED_FILE_EXTS.join(', ')}`, 'error'); return }
     setModelFile(file)
   }
 
   const handleImages = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || [])
     const valid = files.filter(f => {
-      if (!ALLOWED_IMAGE_TYPES.includes(f.type)) { showToast(`${f.name}: formato de imagem não suportado.`, 'error'); return false }
-      if (f.size > MAX_IMAGE_SIZE) { showToast(`${f.name}: imagem muito grande (máx 10MB).`, 'error'); return false }
+      if (!ALLOWED_IMAGE_TYPES.includes(f.type)) { showToast(`${f.name}: formato não suportado.`, 'error'); return false }
       return true
     })
     setImageFiles(prev => [...prev, ...valid].slice(0, 5))
@@ -88,97 +80,12 @@ export default function EnviarPage() {
     if (!modelFile) { showToast('Selecione o arquivo 3D.', 'error'); return }
 
     setLoading(true)
-
-    try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) { showToast('Faça login para enviar.', 'error'); setLoading(false); return }
-
-      const { data: cat } = await supabase.from('categories').select('id').eq('slug', categorySlug).single()
-      if (!cat) { showToast('Categoria inválida.', 'error'); setLoading(false); return }
-
-      // Upload model file
-      const fileExt = modelFile.name.split('.').pop()!.toLowerCase()
-      const filePath = `models/${user.id}/${Date.now()}.${fileExt}`
-      const { error: fileErr } = await supabase.storage.from('models').upload(filePath, modelFile)
-      if (fileErr) throw new Error('Erro ao enviar arquivo: ' + fileErr.message)
-      const { data: { publicUrl: fileUrl } } = supabase.storage.from('models').getPublicUrl(filePath)
-
-      // Upload cover image
-      let coverImageUrl: string | null = null
-      if (imageFiles[0]) {
-        const imgExt = imageFiles[0].name.split('.').pop()!.toLowerCase()
-        const imgPath = `images/${user.id}/${Date.now()}_cover.${imgExt}`
-        await supabase.storage.from('models').upload(imgPath, imageFiles[0])
-        const { data: { publicUrl } } = supabase.storage.from('models').getPublicUrl(imgPath)
-        coverImageUrl = publicUrl
-      }
-
-      // Create unique slug
-      let slug = slugify(title)
-      const { data: existing } = await supabase.from('models').select('id').eq('slug', slug).single()
-      if (existing) slug = `${slug}-${Date.now()}`
-
-      // Insert model
-      const { data: model, error: modelErr } = await supabase.from('models').insert({
-        title: title.trim(),
-        slug,
-        description: description.trim(),
-        user_id: user.id,
-        category_id: cat.id,
-        license,
-        file_url: fileUrl,
-        file_type: fileExt,
-        cover_image_url: coverImageUrl,
-        status: 'pending',
-        downloads_count: 0,
-        material: material || null,
-        print_time: printTime || null,
-        layer_height: layerHeight || null,
-        infill: infill || null,
-        supports_required: supportsRequired === '' ? null : supportsRequired === 'true',
-        printer_used: printerUsed || null,
-        assembly_notes: assemblyNotes || null,
-      }).select().single()
-
-      if (modelErr || !model) throw new Error('Erro ao salvar peça.')
-
-      // Upload additional images
-      if (imageFiles.length > 1) {
-        for (let i = 1; i < imageFiles.length; i++) {
-          const f = imageFiles[i]
-          const ext = f.name.split('.').pop()!.toLowerCase()
-          const path = `images/${user.id}/${Date.now()}_${i}.${ext}`
-          await supabase.storage.from('models').upload(path, f)
-          const { data: { publicUrl } } = supabase.storage.from('models').getPublicUrl(path)
-          await supabase.from('model_images').insert({ model_id: model.id, image_url: publicUrl })
-        }
-      }
-
-      // Handle tags
-      if (tagsInput.trim()) {
-        const tagNames = tagsInput.split(',').map(t => t.trim().toLowerCase()).filter(Boolean)
-        for (const tagName of tagNames) {
-          const tagSlug = slugify(tagName)
-          let tagId: string
-          const { data: existingTag } = await supabase.from('tags').select('id').eq('slug', tagSlug).single()
-          if (existingTag) {
-            tagId = existingTag.id
-          } else {
-            const { data: newTag } = await supabase.from('tags').insert({ name: tagName, slug: tagSlug }).select().single()
-            if (!newTag) continue
-            tagId = newTag.id
-          }
-          await supabase.from('model_tags').insert({ model_id: model.id, tag_id: tagId })
-        }
-      }
-
-      setStep('success')
-    } catch (err) {
-      showToast(err instanceof Error ? err.message : 'Erro ao enviar peça.', 'error')
-    } finally {
-      setLoading(false)
-    }
+    await new Promise(r => setTimeout(r, 1200))
+    setLoading(false)
+    setStep('success')
   }
+
+  if (isLoading || !user) return null
 
   if (step === 'success') {
     return (
@@ -187,7 +94,7 @@ export default function EnviarPage() {
           <CheckCircle size={32} className="text-green-600" />
         </div>
         <h1 className="text-2xl font-bold text-gray-900 mb-2">Peça enviada com sucesso!</h1>
-        <p className="text-gray-500 mb-6">Sua peça foi enviada e está aguardando revisão. Após a aprovação, ficará disponível para todos.</p>
+        <p className="text-gray-500 mb-6">Sua peça foi enviada e está aguardando revisão. Após aprovação, ficará disponível para todos.</p>
         <div className="flex flex-col sm:flex-row gap-3 justify-center">
           <Button onClick={() => { setStep('form'); setTitle(''); setDescription(''); setModelFile(null); setImageFiles([]); setImagePreviews([]) }}>
             Enviar outra peça
@@ -206,57 +113,27 @@ export default function EnviarPage() {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Basic info */}
         <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
           <h2 className="font-semibold text-gray-900">Informações básicas</h2>
           <Input id="title" label="Título *" placeholder="Nome da peça" value={title} onChange={(e) => setTitle(e.target.value)} required />
           <Textarea id="description" label="Descrição *" placeholder="Descreva sua peça, para que serve, como usar..." value={description} onChange={(e) => setDescription(e.target.value)} className="min-h-[120px]" required />
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Select
-              id="category"
-              label="Categoria *"
-              options={CATEGORIES.map(c => ({ value: c.slug, label: `${c.icon} ${c.name}` }))}
-              placeholder="Selecione..."
-              value={categorySlug}
-              onChange={(e) => setCategorySlug(e.target.value)}
-            />
-            <Select
-              id="license"
-              label="Licença *"
-              options={LICENSES.map(l => ({ value: l, label: l }))}
-              placeholder="Selecione..."
-              value={license}
-              onChange={(e) => setLicense(e.target.value)}
-            />
+            <Select id="category" label="Categoria *" options={CATEGORIES.map(c => ({ value: c.slug, label: `${c.icon} ${c.name}` }))} placeholder="Selecione..." value={categorySlug} onChange={(e) => setCategorySlug(e.target.value)} />
+            <Select id="license" label="Licença *" options={LICENSES.map(l => ({ value: l, label: l }))} placeholder="Selecione..." value={license} onChange={(e) => setLicense(e.target.value)} />
           </div>
-          <Input
-            id="tags"
-            label="Tags"
-            placeholder="ex: suporte, parede, ferramenta (separadas por vírgula)"
-            value={tagsInput}
-            onChange={(e) => setTagsInput(e.target.value)}
-            hint="Separe as tags por vírgula"
-          />
+          <Input id="tags" label="Tags" placeholder="ex: suporte, parede, ferramenta (separadas por vírgula)" value={tagsInput} onChange={(e) => setTagsInput(e.target.value)} hint="Separe as tags por vírgula" />
         </div>
 
-        {/* Files */}
         <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
           <h2 className="font-semibold text-gray-900">Arquivos</h2>
 
-          {/* Model file */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Arquivo 3D *</label>
-            <div
-              onClick={() => fileInputRef.current?.click()}
-              className="border-2 border-dashed border-gray-300 rounded-xl p-6 text-center cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-colors"
-            >
+            <div onClick={() => fileInputRef.current?.click()} className="border-2 border-dashed border-gray-300 rounded-xl p-6 text-center cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-colors">
               {modelFile ? (
                 <div className="flex items-center justify-center gap-2 text-green-700">
-                  <File size={20} />
-                  <span className="text-sm font-medium">{modelFile.name}</span>
-                  <button type="button" onClick={(e) => { e.stopPropagation(); setModelFile(null) }} className="text-red-500 hover:text-red-700">
-                    <X size={16} />
-                  </button>
+                  <File size={20} /><span className="text-sm font-medium">{modelFile.name}</span>
+                  <button type="button" onClick={(e) => { e.stopPropagation(); setModelFile(null) }} className="text-red-500 hover:text-red-700"><X size={16} /></button>
                 </div>
               ) : (
                 <div>
@@ -269,16 +146,12 @@ export default function EnviarPage() {
             <input ref={fileInputRef} type="file" accept=".stl,.obj,.3mf,.step,.zip" className="hidden" onChange={handleModelFile} />
           </div>
 
-          {/* Images */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Imagens (máx. 5)</label>
-            <div
-              onClick={() => imageInputRef.current?.click()}
-              className="border-2 border-dashed border-gray-300 rounded-xl p-4 text-center cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-colors mb-3"
-            >
+            <div onClick={() => imageInputRef.current?.click()} className="border-2 border-dashed border-gray-300 rounded-xl p-4 text-center cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-colors mb-3">
               <ImageIcon size={20} className="mx-auto mb-1 text-gray-400" />
               <p className="text-sm text-gray-600">Adicionar imagens de prévia</p>
-              <p className="text-xs text-gray-400 mt-0.5">JPG, PNG, WebP — máx. 10MB cada</p>
+              <p className="text-xs text-gray-400 mt-0.5">JPG, PNG, WebP</p>
             </div>
             <input ref={imageInputRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif" multiple className="hidden" onChange={handleImages} />
             {imagePreviews.length > 0 && (
@@ -286,9 +159,7 @@ export default function EnviarPage() {
                 {imagePreviews.map((preview, i) => (
                   <div key={i} className="relative w-20 h-20">
                     <img src={preview} alt="" className="w-full h-full object-cover rounded-lg border border-gray-200" />
-                    <button type="button" onClick={() => removeImage(i)} className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center">
-                      <X size={10} />
-                    </button>
+                    <button type="button" onClick={() => removeImage(i)} className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center"><X size={10} /></button>
                     {i === 0 && <span className="absolute bottom-0 left-0 right-0 bg-blue-600 text-white text-xs text-center rounded-b-lg">Capa</span>}
                   </div>
                 ))}
@@ -297,29 +168,14 @@ export default function EnviarPage() {
           </div>
         </div>
 
-        {/* Print settings */}
         <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
           <h2 className="font-semibold text-gray-900">Configurações de Impressão <span className="text-gray-400 font-normal text-sm">(opcional)</span></h2>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-            <Select
-              id="material"
-              label="Material"
-              options={MATERIALS.map(m => ({ value: m, label: m }))}
-              placeholder="Selecione..."
-              value={material}
-              onChange={(e) => setMaterial(e.target.value)}
-            />
+            <Select id="material" label="Material" options={MATERIALS.map(m => ({ value: m, label: m }))} placeholder="Selecione..." value={material} onChange={(e) => setMaterial(e.target.value)} />
             <Input id="printTime" label="Tempo estimado" placeholder="ex: 3h30min" value={printTime} onChange={(e) => setPrintTime(e.target.value)} />
             <Input id="layerHeight" label="Altura de camada (mm)" placeholder="ex: 0.2" value={layerHeight} onChange={(e) => setLayerHeight(e.target.value)} />
             <Input id="infill" label="Preenchimento (%)" placeholder="ex: 20" value={infill} onChange={(e) => setInfill(e.target.value)} />
-            <Select
-              id="supports"
-              label="Suporte"
-              options={[{ value: 'false', label: 'Não necessário' }, { value: 'true', label: 'Necessário' }]}
-              placeholder="Selecione..."
-              value={supportsRequired}
-              onChange={(e) => setSupportsRequired(e.target.value)}
-            />
+            <Select id="supports" label="Suporte" options={[{ value: 'false', label: 'Não necessário' }, { value: 'true', label: 'Necessário' }]} placeholder="Selecione..." value={supportsRequired} onChange={(e) => setSupportsRequired(e.target.value)} />
             <Input id="printer" label="Impressora utilizada" placeholder="ex: Ender 3" value={printerUsed} onChange={(e) => setPrinterUsed(e.target.value)} />
           </div>
           <Textarea id="assemblyNotes" label="Observações de montagem" placeholder="Dicas para montar ou pós-processar a peça..." value={assemblyNotes} onChange={(e) => setAssemblyNotes(e.target.value)} className="min-h-[80px]" />
@@ -328,8 +184,7 @@ export default function EnviarPage() {
         <div className="flex gap-3 justify-end">
           <Button type="button" variant="outline" onClick={() => router.back()}>Cancelar</Button>
           <Button type="submit" loading={loading} size="lg">
-            <Upload size={16} />
-            Enviar Peça
+            <Upload size={16} />Enviar Peça
           </Button>
         </div>
       </form>

@@ -1,50 +1,12 @@
 import Link from 'next/link'
 import { Download, Upload, Printer, Share2, ArrowRight, Search, Zap } from 'lucide-react'
-import { createClient } from '@/lib/supabase/server'
 import ModelCard from '@/components/models/ModelCard'
 import { CATEGORIES } from '@/lib/utils'
-import type { Model } from '@/types'
+import { MOCK_MODELS, MOCK_STATS } from '@/lib/mock-data'
 
-async function getFeaturedModels() {
-  const supabase = await createClient()
-  const { data } = await supabase
-    .from('models')
-    .select(`*, profile:profiles(id,name,avatar_url,role), category:categories(id,name,slug,icon), tags:model_tags(tags(id,name,slug)), images:model_images(id,image_url,created_at)`)
-    .eq('status', 'published')
-    .order('downloads_count', { ascending: false })
-    .limit(8)
-  return normalizeModels(data || [])
-}
-
-async function getRecentModels() {
-  const supabase = await createClient()
-  const { data } = await supabase
-    .from('models')
-    .select(`*, profile:profiles(id,name,avatar_url,role), category:categories(id,name,slug,icon), tags:model_tags(tags(id,name,slug)), images:model_images(id,image_url,created_at)`)
-    .eq('status', 'published')
-    .order('created_at', { ascending: false })
-    .limit(8)
-  return normalizeModels(data || [])
-}
-
-async function getStats() {
-  const supabase = await createClient()
-  const [modelsRes, usersRes, downloadsRes] = await Promise.all([
-    supabase.from('models').select('id', { count: 'exact', head: true }).eq('status', 'published'),
-    supabase.from('profiles').select('id', { count: 'exact', head: true }),
-    supabase.from('downloads').select('id', { count: 'exact', head: true }),
-  ])
-  return { models: modelsRes.count || 0, users: usersRes.count || 0, downloads: downloadsRes.count || 0 }
-}
-
-function normalizeModel(data: Record<string, unknown>): Model {
-  const tags = Array.isArray(data.tags) ? data.tags.map((mt: Record<string, unknown>) => mt.tags).filter(Boolean) : []
-  return { ...data, tags, profile: data.profile || undefined, category: data.category || undefined, images: Array.isArray(data.images) ? data.images : [] } as Model
-}
-function normalizeModels(data: Record<string, unknown>[]): Model[] { return data.map(normalizeModel) }
-
-export default async function HomePage() {
-  const [featured, recent, stats] = await Promise.all([getFeaturedModels(), getRecentModels(), getStats()])
+export default function HomePage() {
+  const featured = [...MOCK_MODELS].sort((a, b) => b.downloads_count - a.downloads_count).slice(0, 8)
+  const recent = [...MOCK_MODELS].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).slice(0, 8)
 
   return (
     <div>
@@ -76,9 +38,9 @@ export default async function HomePage() {
         <div className="border-t border-white/20">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
             <div className="grid grid-cols-3 gap-4 text-center">
-              <div><p className="text-2xl sm:text-3xl font-bold">{stats.models.toLocaleString('pt-BR')}</p><p className="text-blue-200 text-sm">Modelos 3D</p></div>
-              <div><p className="text-2xl sm:text-3xl font-bold">{stats.users.toLocaleString('pt-BR')}</p><p className="text-blue-200 text-sm">Usuários</p></div>
-              <div><p className="text-2xl sm:text-3xl font-bold">{stats.downloads.toLocaleString('pt-BR')}</p><p className="text-blue-200 text-sm">Downloads</p></div>
+              <div><p className="text-2xl sm:text-3xl font-bold">{MOCK_STATS.models.toLocaleString('pt-BR')}</p><p className="text-blue-200 text-sm">Modelos 3D</p></div>
+              <div><p className="text-2xl sm:text-3xl font-bold">{MOCK_STATS.users.toLocaleString('pt-BR')}</p><p className="text-blue-200 text-sm">Usuários</p></div>
+              <div><p className="text-2xl sm:text-3xl font-bold">{MOCK_STATS.downloads.toLocaleString('pt-BR')}</p><p className="text-blue-200 text-sm">Downloads</p></div>
             </div>
           </div>
         </div>
@@ -124,32 +86,28 @@ export default async function HomePage() {
       </section>
 
       {/* Most downloaded */}
-      {featured.length > 0 && (
-        <section className="bg-white border-y border-gray-100">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-            <div className="flex items-center justify-between mb-6">
-              <div><h2 className="text-2xl font-bold text-gray-900">Mais Baixadas</h2><p className="text-gray-500 text-sm mt-1">As peças favoritas da comunidade</p></div>
-              <Link href="/explorar?sort=downloads" className="text-blue-600 hover:text-blue-700 text-sm font-medium flex items-center gap-1">Ver mais <ArrowRight size={14} /></Link>
-            </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-              {featured.map((model) => <ModelCard key={model.id} model={model} />)}
-            </div>
-          </div>
-        </section>
-      )}
-
-      {/* Recent */}
-      {recent.length > 0 && (
-        <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+      <section className="bg-white border-y border-gray-100">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
           <div className="flex items-center justify-between mb-6">
-            <div><h2 className="text-2xl font-bold text-gray-900">Adicionadas Recentemente</h2><p className="text-gray-500 text-sm mt-1">Novidades da comunidade</p></div>
-            <Link href="/explorar?sort=recent" className="text-blue-600 hover:text-blue-700 text-sm font-medium flex items-center gap-1">Ver mais <ArrowRight size={14} /></Link>
+            <div><h2 className="text-2xl font-bold text-gray-900">Mais Baixadas</h2><p className="text-gray-500 text-sm mt-1">As peças favoritas da comunidade</p></div>
+            <Link href="/explorar?sort=downloads" className="text-blue-600 hover:text-blue-700 text-sm font-medium flex items-center gap-1">Ver mais <ArrowRight size={14} /></Link>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-            {recent.map((model) => <ModelCard key={model.id} model={model} />)}
+            {featured.map((model) => <ModelCard key={model.id} model={model} />)}
           </div>
-        </section>
-      )}
+        </div>
+      </section>
+
+      {/* Recent */}
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+        <div className="flex items-center justify-between mb-6">
+          <div><h2 className="text-2xl font-bold text-gray-900">Adicionadas Recentemente</h2><p className="text-gray-500 text-sm mt-1">Novidades da comunidade</p></div>
+          <Link href="/explorar?sort=recent" className="text-blue-600 hover:text-blue-700 text-sm font-medium flex items-center gap-1">Ver mais <ArrowRight size={14} /></Link>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+          {recent.map((model) => <ModelCard key={model.id} model={model} />)}
+        </div>
+      </section>
 
       {/* CTA */}
       <section className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white">

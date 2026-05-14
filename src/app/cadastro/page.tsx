@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
+import { useAuth } from '@/lib/auth-context'
 import { Layers, UserPlus } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
@@ -15,26 +15,19 @@ export default function CadastroPage() {
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const router = useRouter()
-  const supabase = createClient()
+  const { register } = useAuth()
   const { showToast } = useToast()
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (password.length < 6) {
-      showToast('A senha deve ter pelo menos 6 caracteres.', 'error')
-      return
-    }
+    if (password.length < 6) { showToast('A senha deve ter pelo menos 6 caracteres.', 'error'); return }
     setLoading(true)
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: { data: { name } },
-    })
+    const { error } = await register(name, email, password)
     if (error) {
-      showToast(error.message, 'error')
+      showToast(error, 'error')
     } else {
-      showToast('Conta criada! Verifique seu email para confirmar o cadastro.')
-      router.push('/login')
+      showToast('Conta criada com sucesso! Bem-vindo(a) ao 3D Livre.')
+      router.push('/')
     }
     setLoading(false)
   }
@@ -55,39 +48,11 @@ export default function CadastroPage() {
 
         <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-8">
           <form onSubmit={handleRegister} className="space-y-4">
-            <Input
-              id="name"
-              type="text"
-              label="Nome"
-              placeholder="Seu nome"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              required
-            />
-            <Input
-              id="email"
-              type="email"
-              label="Email"
-              placeholder="seu@email.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              autoComplete="email"
-            />
-            <Input
-              id="password"
-              type="password"
-              label="Senha"
-              placeholder="Mínimo 6 caracteres"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              autoComplete="new-password"
-              hint="Use pelo menos 6 caracteres"
-            />
+            <Input id="name" type="text" label="Nome" placeholder="Seu nome" value={name} onChange={(e) => setName(e.target.value)} required />
+            <Input id="email" type="email" label="Email" placeholder="seu@email.com" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email" />
+            <Input id="password" type="password" label="Senha" placeholder="Mínimo 6 caracteres" value={password} onChange={(e) => setPassword(e.target.value)} required autoComplete="new-password" hint="Use pelo menos 6 caracteres" />
             <Button type="submit" className="w-full" loading={loading} size="lg">
-              <UserPlus size={16} />
-              Criar conta
+              <UserPlus size={16} />Criar conta
             </Button>
           </form>
 
@@ -98,9 +63,7 @@ export default function CadastroPage() {
 
           <div className="mt-4 text-center text-sm text-gray-600">
             Já tem conta?{' '}
-            <Link href="/login" className="text-blue-600 hover:text-blue-700 font-medium">
-              Entrar
-            </Link>
+            <Link href="/login" className="text-blue-600 hover:text-blue-700 font-medium">Entrar</Link>
           </div>
         </div>
       </div>

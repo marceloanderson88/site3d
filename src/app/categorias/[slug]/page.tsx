@@ -1,10 +1,8 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
-import { createClient } from '@/lib/supabase/server'
 import ModelCard from '@/components/models/ModelCard'
-import { CATEGORIES } from '@/lib/utils'
 import { ChevronRight } from 'lucide-react'
-import type { Model } from '@/types'
+import { MOCK_CATEGORIES, getModelsByCategory } from '@/lib/mock-data'
 
 interface CategoryPageProps {
   params: Promise<{ slug: string }>
@@ -12,37 +10,21 @@ interface CategoryPageProps {
 
 export async function generateMetadata({ params }: CategoryPageProps) {
   const { slug } = await params
-  const cat = CATEGORIES.find(c => c.slug === slug)
+  const cat = MOCK_CATEGORIES.find(c => c.slug === slug)
   if (!cat) return {}
   return { title: `${cat.name} — 3D Livre`, description: `Modelos 3D na categoria ${cat.name}` }
 }
 
 export default async function CategoryPage({ params }: CategoryPageProps) {
   const { slug } = await params
-  const cat = CATEGORIES.find(c => c.slug === slug)
+  const cat = MOCK_CATEGORIES.find(c => c.slug === slug)
   if (!cat) notFound()
 
-  const supabase = await createClient()
-  const { data: dbCat } = await supabase.from('categories').select('id').eq('slug', slug).single()
-
-  let models: Model[] = []
-  if (dbCat) {
-    const { data } = await supabase
-      .from('models')
-      .select(`*, profile:profiles(id,name,avatar_url,role), category:categories(id,name,slug,icon), tags:model_tags(tags(id,name,slug)), images:model_images(id,image_url,created_at)`)
-      .eq('category_id', dbCat.id)
-      .eq('status', 'published')
-      .order('created_at', { ascending: false })
-
-    models = (data || []).map((d: Record<string, unknown>) => {
-      const tags = Array.isArray(d.tags) ? d.tags.map((mt: Record<string, unknown>) => mt.tags).filter(Boolean) : []
-      return { ...d, tags, profile: d.profile || undefined, category: d.category || undefined, images: Array.isArray(d.images) ? d.images : [] } as Model
-    })
-  }
+  const models = getModelsByCategory(cat.id)
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <nav className="flex items-center gap-2 text-sm text-gray-500 mb-6">
+      <nav className="flex items-center gap-2 text-sm text-gray-500 mb-6 flex-wrap">
         <Link href="/" className="hover:text-gray-900">Início</Link>
         <ChevronRight size={14} />
         <Link href="/categorias" className="hover:text-gray-900">Categorias</Link>

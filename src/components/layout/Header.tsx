@@ -2,53 +2,21 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { useState, useEffect } from 'react'
-import { createClient } from '@/lib/supabase/client'
+import { useState } from 'react'
+import { useAuth } from '@/lib/auth-context'
 import { Search, Menu, X, Upload, Layers, User, LogOut, Settings, ChevronDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import type { Profile } from '@/types'
 
 export default function Header() {
-  const [user, setUser] = useState<Profile | null>(null)
+  const { user, logout } = useAuth()
   const [menuOpen, setMenuOpen] = useState(false)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [search, setSearch] = useState('')
   const router = useRouter()
   const pathname = usePathname()
-  const supabase = createClient()
 
-  useEffect(() => {
-    const fetchUser = async () => {
-      const { data: { user: authUser } } = await supabase.auth.getUser()
-      if (authUser) {
-        const { data } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', authUser.id)
-          .single()
-        setUser(data)
-      }
-    }
-    fetchUser()
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (session?.user) {
-        const { data } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', session.user.id)
-          .single()
-        setUser(data)
-      } else {
-        setUser(null)
-      }
-    })
-
-    return () => subscription.unsubscribe()
-  }, [])
-
-  const handleLogout = async () => {
-    await supabase.auth.signOut()
+  const handleLogout = () => {
+    logout()
     router.push('/')
     setUserMenuOpen(false)
   }
@@ -79,7 +47,7 @@ export default function Header() {
             <span className="font-bold text-gray-900 text-lg hidden sm:block">3D Livre</span>
           </Link>
 
-          {/* Search bar */}
+          {/* Search */}
           <form onSubmit={handleSearch} className="flex-1 max-w-lg hidden md:flex">
             <div className="relative w-full">
               <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -144,39 +112,20 @@ export default function Header() {
                             <span className="text-xs text-blue-600 font-medium">Admin</span>
                           )}
                         </div>
-                        <Link
-                          href="/minha-conta"
-                          className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                          onClick={() => setUserMenuOpen(false)}
-                        >
-                          <User size={14} />
-                          Minha Conta
+                        <Link href="/minha-conta" className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50" onClick={() => setUserMenuOpen(false)}>
+                          <User size={14} />Minha Conta
                         </Link>
-                        <Link
-                          href="/minha-conta/pecas"
-                          className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                          onClick={() => setUserMenuOpen(false)}
-                        >
-                          <Layers size={14} />
-                          Minhas Peças
+                        <Link href="/minha-conta/pecas" className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50" onClick={() => setUserMenuOpen(false)}>
+                          <Layers size={14} />Minhas Peças
                         </Link>
                         {user.role === 'admin' && (
-                          <Link
-                            href="/admin"
-                            className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                            onClick={() => setUserMenuOpen(false)}
-                          >
-                            <Settings size={14} />
-                            Administração
+                          <Link href="/admin" className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50" onClick={() => setUserMenuOpen(false)}>
+                            <Settings size={14} />Administração
                           </Link>
                         )}
                         <div className="border-t border-gray-100 mt-1 pt-1">
-                          <button
-                            onClick={handleLogout}
-                            className="flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 w-full text-left"
-                          >
-                            <LogOut size={14} />
-                            Sair
+                          <button onClick={handleLogout} className="flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 w-full text-left">
+                            <LogOut size={14} />Sair
                           </button>
                         </div>
                       </div>
@@ -186,22 +135,15 @@ export default function Header() {
               </>
             ) : (
               <>
-                <Link
-                  href="/login"
-                  className="text-sm font-medium text-gray-700 hover:text-gray-900 px-3 py-2"
-                >
+                <Link href="/login" className="text-sm font-medium text-gray-700 hover:text-gray-900 px-3 py-2">
                   Entrar
                 </Link>
-                <Link
-                  href="/cadastro"
-                  className="bg-blue-600 text-white px-3 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
-                >
+                <Link href="/cadastro" className="bg-blue-600 text-white px-3 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors">
                   Cadastrar
                 </Link>
               </>
             )}
 
-            {/* Mobile menu button */}
             <button
               onClick={() => setMenuOpen(!menuOpen)}
               className="lg:hidden p-2 rounded-lg hover:bg-gray-100"
@@ -229,23 +171,13 @@ export default function Header() {
             </form>
             <nav className="flex flex-col gap-1">
               {navLinks.map((link) => (
-                <Link
-                  key={link.href}
-                  href={link.href}
-                  className="px-3 py-2 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100"
-                  onClick={() => setMenuOpen(false)}
-                >
+                <Link key={link.href} href={link.href} className="px-3 py-2 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100" onClick={() => setMenuOpen(false)}>
                   {link.label}
                 </Link>
               ))}
               {user && (
-                <Link
-                  href="/enviar"
-                  className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-blue-600"
-                  onClick={() => setMenuOpen(false)}
-                >
-                  <Upload size={14} />
-                  Enviar Peça
+                <Link href="/enviar" className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-blue-600" onClick={() => setMenuOpen(false)}>
+                  <Upload size={14} />Enviar Peça
                 </Link>
               )}
             </nav>

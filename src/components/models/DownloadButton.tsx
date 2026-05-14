@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { Download, Loader2 } from 'lucide-react'
-import { createClient } from '@/lib/supabase/client'
+import { useToast } from '@/components/ui/Toast'
 import type { Model } from '@/types'
 
 interface DownloadButtonProps {
@@ -11,22 +11,13 @@ interface DownloadButtonProps {
 
 export default function DownloadButton({ model }: DownloadButtonProps) {
   const [loading, setLoading] = useState(false)
-  const supabase = createClient()
+  const { showToast } = useToast()
 
   const handleDownload = async () => {
     setLoading(true)
-    try {
-      const { data: { user } } = await supabase.auth.getUser()
-      await supabase.from('downloads').insert({
-        model_id: model.id,
-        user_id: user?.id || null,
-      })
-      window.open(model.file_url, '_blank')
-    } catch {
-      window.open(model.file_url, '_blank')
-    } finally {
-      setLoading(false)
-    }
+    await new Promise(r => setTimeout(r, 800))
+    showToast('Download iniciado! (Demo — sem arquivo real)')
+    setLoading(false)
   }
 
   return (

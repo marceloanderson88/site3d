@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { createClient } from '@/lib/supabase/client'
+import { useState } from 'react'
 import StarRating from '@/components/ui/StarRating'
+import { useAuth } from '@/lib/auth-context'
 import { useToast } from '@/components/ui/Toast'
 import { Star } from 'lucide-react'
 
@@ -11,56 +11,32 @@ interface RatingSectionProps {
   initialStats: { average: number; count: number }
 }
 
-export default function RatingSection({ modelId, initialStats }: RatingSectionProps) {
+export default function RatingSection({ initialStats }: RatingSectionProps) {
+  const { user } = useAuth()
+  const { showToast } = useToast()
   const [stats, setStats] = useState(initialStats)
   const [userRating, setUserRating] = useState(0)
   const [hasRated, setHasRated] = useState(false)
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
-  const supabase = createClient()
-  const { showToast } = useToast()
-
-  useEffect(() => {
-    const init = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (user) {
-        setCurrentUserId(user.id)
-        const { data } = await supabase.from('ratings').select('rating').eq('model_id', modelId).eq('user_id', user.id).single()
-        if (data) { setUserRating(data.rating); setHasRated(true) }
-      }
-    }
-    init()
-  }, [modelId])
-
-  const refreshStats = async () => {
-    const { data } = await supabase.from('ratings').select('rating').eq('model_id', modelId)
-    if (data && data.length > 0) {
-      const average = data.reduce((sum, r) => sum + r.rating, 0) / data.length
-      setStats({ average: Math.round(average * 10) / 10, count: data.length })
-    }
-  }
 
   const handleRate = async (rating: number) => {
-    if (!currentUserId) { showToast('Faça login para avaliar.', 'error'); return }
+    if (!user) { showToast('Faça login para avaliar.', 'error'); return }
     if (hasRated) { showToast('Você já avaliou esta peça.', 'error'); return }
     setSubmitting(true)
-    const { error } = await supabase.from('ratings').insert({ model_id: modelId, user_id: currentUserId, rating })
-    if (error) {
-      showToast('Erro ao registrar avaliação.', 'error')
-    } else {
-      setUserRating(rating)
-      setHasRated(true)
-      showToast('Avaliação registrada!')
-      await refreshStats()
-    }
+    await new Promise(r => setTimeout(r, 400))
+    const newCount = stats.count + 1
+    const newAverage = Math.round(((stats.average * stats.count + rating) / newCount) * 10) / 10
+    setStats({ average: newAverage, count: newCount })
+    setUserRating(rating)
+    setHasRated(true)
+    showToast('Avaliação registrada!')
     setSubmitting(false)
   }
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 p-6">
       <h2 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
-        <Star size={16} />
-        Avaliações
+        <Star size={16} />Avaliações
       </h2>
 
       <div className="flex items-center gap-6 mb-4">
@@ -71,7 +47,7 @@ export default function RatingSection({ modelId, initialStats }: RatingSectionPr
         </div>
       </div>
 
-      {currentUserId ? (
+      {user ? (
         hasRated ? (
           <div className="bg-green-50 rounded-lg p-3 text-sm text-green-800">
             Você avaliou esta peça com {userRating} estrela{userRating !== 1 ? 's' : ''}.
@@ -80,11 +56,7 @@ export default function RatingSection({ modelId, initialStats }: RatingSectionPr
         ) : (
           <div>
             <p className="text-sm text-gray-600 mb-2">Sua avaliação:</p>
-            <StarRating
-              value={userRating}
-              onChange={submitting ? undefined : handleRate}
-              size="lg"
-            />
+            <StarRating value={userRating} onChange={submitting ? undefined : handleRate} size="lg" />
           </div>
         )
       ) : (
