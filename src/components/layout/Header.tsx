@@ -4,8 +4,7 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { useAuth } from '@/lib/auth-context'
-import { Search, Menu, X, Upload, Layers, User, LogOut, Settings, ChevronDown } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { Search, Menu, X, Upload, User, LogOut, Settings, ChevronDown, Layers } from 'lucide-react'
 
 export default function Header() {
   const { user, logout } = useAuth()
@@ -30,104 +29,122 @@ export default function Header() {
   }
 
   const navLinks = [
-    { href: '/explorar', label: 'Explorar' },
-    { href: '/categorias', label: 'Categorias' },
-    { href: '/sobre', label: 'Sobre' },
+    { href: '/explorar', label: 'Explorar', code: '§01' },
+    { href: '/categorias', label: 'Categorias', code: '§02' },
+    { href: '/sobre', label: 'Manifesto', code: '§03' },
   ]
 
   return (
-    <header className="sticky top-0 z-40 bg-white border-b border-gray-200 shadow-sm">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16 gap-4">
-          {/* Logo */}
-          <Link href="/" className="flex items-center gap-2 shrink-0">
-            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-              <Layers size={18} className="text-white" />
+    <header className="sticky top-0 z-40 bg-paper/95 backdrop-blur border-b border-ink">
+      <div className="border-b border-hairline">
+        <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-10 flex items-center justify-between h-7 text-[10px] uppercase tracking-[0.18em] text-ink-mute font-mono">
+          <span className="flex items-center gap-3">
+            <span className="inline-block w-1.5 h-1.5 bg-vermillion blink" />
+            REPOSITÓRIO ABERTO · BR
+          </span>
+          <span className="hidden sm:flex items-center gap-4">
+            <span>EST. 2026</span>
+            <span className="hidden md:inline">ED. 01 — VOL. 01</span>
+            <span>CC · OPEN SOURCE</span>
+          </span>
+        </div>
+      </div>
+
+      <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-10">
+        <div className="flex items-center justify-between h-16 lg:h-20 gap-6">
+          <Link href="/" className="flex items-baseline gap-2.5 shrink-0 group">
+            <div className="relative w-9 h-9 border border-ink flex items-center justify-center bg-paper group-hover:bg-ink transition-colors">
+              <Layers size={16} strokeWidth={1.5} className="text-ink group-hover:text-paper transition-colors" />
+              <span className="absolute -top-1 -right-1 w-2 h-2 bg-vermillion" />
             </div>
-            <span className="font-bold text-gray-900 text-lg hidden sm:block">3D Livre</span>
+            <div className="leading-none">
+              <div className="font-display text-[26px] font-medium tracking-tight" style={{ fontVariationSettings: '"opsz" 36, "SOFT" 30, "WONK" 1' }}>
+                3D<span className="text-vermillion">·</span>Livre
+              </div>
+              <div className="font-mono text-[9px] uppercase tracking-[0.22em] text-ink-mute mt-0.5">
+                Repositório / Open Source
+              </div>
+            </div>
           </Link>
 
-          {/* Search */}
-          <form onSubmit={handleSearch} className="flex-1 max-w-lg hidden md:flex">
+          <form onSubmit={handleSearch} className="flex-1 max-w-xl hidden md:flex">
             <div className="relative w-full">
-              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <div className="absolute left-0 top-1/2 -translate-y-1/2 font-mono text-[12px] text-vermillion pl-3">›</div>
               <input
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Buscar peças 3D..."
-                className="w-full pl-9 pr-4 py-2 rounded-lg border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="buscar.peças( )"
+                className="w-full pl-8 pr-12 py-2.5 bg-transparent border border-ink text-sm font-mono placeholder:text-ink-mute focus:outline-none focus:bg-paper-2 transition-colors"
               />
+              <button type="submit" className="absolute right-0 top-0 h-full px-3 border-l border-ink hover:bg-ink hover:text-paper transition-colors">
+                <Search size={14} strokeWidth={1.5} />
+              </button>
             </div>
           </form>
 
-          {/* Nav links - desktop */}
           <nav className="hidden lg:flex items-center gap-1">
-            {navLinks.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                className={cn(
-                  'px-3 py-2 rounded-lg text-sm font-medium transition-colors',
-                  pathname === link.href
-                    ? 'text-blue-600 bg-blue-50'
-                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
-                )}
-              >
-                {link.label}
-              </Link>
-            ))}
+            {navLinks.map((link) => {
+              const active = pathname === link.href
+              return (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  className="group relative px-3 py-2 font-mono text-[11px] uppercase tracking-[0.16em]"
+                >
+                  <span className="text-ink-mute mr-1.5">{link.code}</span>
+                  <span className={active ? 'text-vermillion' : 'text-ink group-hover:text-vermillion transition-colors'}>
+                    {link.label}
+                  </span>
+                  {active && <span className="absolute left-3 right-3 -bottom-0.5 h-px bg-vermillion" />}
+                </Link>
+              )
+            })}
           </nav>
 
-          {/* Right side */}
           <div className="flex items-center gap-2 shrink-0">
             {user ? (
               <>
-                <Link
-                  href="/enviar"
-                  className="hidden sm:flex items-center gap-1.5 bg-blue-600 text-white px-3 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
-                >
-                  <Upload size={14} />
-                  Enviar Peça
+                <Link href="/enviar" className="hidden sm:inline-flex btn-ink !py-2.5 !px-3.5 !text-[11px]">
+                  <Upload size={13} strokeWidth={1.5} /> Enviar
                 </Link>
 
                 <div className="relative">
                   <button
                     onClick={() => setUserMenuOpen(!userMenuOpen)}
-                    className="flex items-center gap-2 p-1.5 rounded-lg hover:bg-gray-100 transition-colors"
+                    className="flex items-center gap-2 pl-1 pr-2 py-1 border border-ink hover:bg-ink hover:text-paper transition-colors"
                   >
-                    <div className="w-7 h-7 rounded-full bg-blue-600 flex items-center justify-center text-white text-xs font-bold">
+                    <div className="w-7 h-7 bg-vermillion text-paper flex items-center justify-center font-mono text-xs font-bold">
                       {user.name?.[0]?.toUpperCase() || 'U'}
                     </div>
-                    <ChevronDown size={14} className="text-gray-500 hidden sm:block" />
+                    <ChevronDown size={12} strokeWidth={1.5} className="hidden sm:block" />
                   </button>
 
                   {userMenuOpen && (
                     <>
                       <div className="fixed inset-0 z-10" onClick={() => setUserMenuOpen(false)} />
-                      <div className="absolute right-0 top-full mt-1 w-48 bg-white rounded-xl border border-gray-200 shadow-lg z-20 py-1">
-                        <div className="px-3 py-2 border-b border-gray-100">
-                          <p className="text-sm font-medium text-gray-900 truncate">{user.name}</p>
+                      <div className="absolute right-0 top-full mt-2 w-60 bg-paper border border-ink shadow-[4px_4px_0_var(--ink)] z-20">
+                        <div className="px-3 py-2.5 border-b border-ink bg-paper-2">
+                          <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-ink-mute">Sessão</p>
+                          <p className="font-display text-base truncate">{user.name}</p>
                           {user.role === 'admin' && (
-                            <span className="text-xs text-blue-600 font-medium">Admin</span>
+                            <span className="inline-block mt-0.5 px-1.5 py-0.5 bg-vermillion text-paper font-mono text-[9px] uppercase tracking-[0.2em]">Admin</span>
                           )}
                         </div>
-                        <Link href="/minha-conta" className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50" onClick={() => setUserMenuOpen(false)}>
-                          <User size={14} />Minha Conta
+                        <Link href="/minha-conta" className="flex items-center gap-2 px-3 py-2.5 font-mono text-[11px] uppercase tracking-[0.14em] hover:bg-paper-2" onClick={() => setUserMenuOpen(false)}>
+                          <User size={13} strokeWidth={1.5} />Minha Conta
                         </Link>
-                        <Link href="/minha-conta/pecas" className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50" onClick={() => setUserMenuOpen(false)}>
-                          <Layers size={14} />Minhas Peças
+                        <Link href="/minha-conta/pecas" className="flex items-center gap-2 px-3 py-2.5 font-mono text-[11px] uppercase tracking-[0.14em] hover:bg-paper-2" onClick={() => setUserMenuOpen(false)}>
+                          <Layers size={13} strokeWidth={1.5} />Minhas Peças
                         </Link>
                         {user.role === 'admin' && (
-                          <Link href="/admin" className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50" onClick={() => setUserMenuOpen(false)}>
-                            <Settings size={14} />Administração
+                          <Link href="/admin" className="flex items-center gap-2 px-3 py-2.5 font-mono text-[11px] uppercase tracking-[0.14em] hover:bg-paper-2" onClick={() => setUserMenuOpen(false)}>
+                            <Settings size={13} strokeWidth={1.5} />Administração
                           </Link>
                         )}
-                        <div className="border-t border-gray-100 mt-1 pt-1">
-                          <button onClick={handleLogout} className="flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 w-full text-left">
-                            <LogOut size={14} />Sair
-                          </button>
-                        </div>
+                        <button onClick={handleLogout} className="flex items-center gap-2 px-3 py-2.5 font-mono text-[11px] uppercase tracking-[0.14em] text-vermillion hover:bg-vermillion hover:text-paper w-full text-left border-t border-ink">
+                          <LogOut size={13} strokeWidth={1.5} />Encerrar
+                        </button>
                       </div>
                     </>
                   )}
@@ -135,10 +152,10 @@ export default function Header() {
               </>
             ) : (
               <>
-                <Link href="/login" className="text-sm font-medium text-gray-700 hover:text-gray-900 px-3 py-2">
+                <Link href="/login" className="font-mono text-[11px] uppercase tracking-[0.16em] px-3 py-2 hover:text-vermillion transition-colors">
                   Entrar
                 </Link>
-                <Link href="/cadastro" className="bg-blue-600 text-white px-3 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors">
+                <Link href="/cadastro" className="btn-ink !py-2.5 !px-3.5 !text-[11px]">
                   Cadastrar
                 </Link>
               </>
@@ -146,38 +163,38 @@ export default function Header() {
 
             <button
               onClick={() => setMenuOpen(!menuOpen)}
-              className="lg:hidden p-2 rounded-lg hover:bg-gray-100"
+              className="lg:hidden p-2 border border-ink"
               aria-label="Menu"
             >
-              {menuOpen ? <X size={20} /> : <Menu size={20} />}
+              {menuOpen ? <X size={16} strokeWidth={1.5} /> : <Menu size={16} strokeWidth={1.5} />}
             </button>
           </div>
         </div>
 
-        {/* Mobile menu */}
         {menuOpen && (
-          <div className="lg:hidden pb-4 border-t border-gray-100 mt-2 pt-3">
-            <form onSubmit={handleSearch} className="mb-3 md:hidden">
+          <div className="lg:hidden pb-5 border-t border-hairline pt-4">
+            <form onSubmit={handleSearch} className="mb-4 md:hidden">
               <div className="relative">
-                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-vermillion font-mono">›</span>
                 <input
                   type="text"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Buscar peças 3D..."
-                  className="w-full pl-9 pr-4 py-2 rounded-lg border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="buscar.peças( )"
+                  className="w-full pl-8 pr-4 py-2.5 bg-transparent border border-ink text-sm font-mono focus:outline-none"
                 />
               </div>
             </form>
-            <nav className="flex flex-col gap-1">
+            <nav className="flex flex-col">
               {navLinks.map((link) => (
-                <Link key={link.href} href={link.href} className="px-3 py-2 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100" onClick={() => setMenuOpen(false)}>
-                  {link.label}
+                <Link key={link.href} href={link.href} className="flex items-center justify-between px-1 py-3 border-b border-hairline font-mono text-xs uppercase tracking-[0.18em] hover:text-vermillion" onClick={() => setMenuOpen(false)}>
+                  <span>{link.label}</span>
+                  <span className="text-ink-mute">{link.code} →</span>
                 </Link>
               ))}
               {user && (
-                <Link href="/enviar" className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-blue-600" onClick={() => setMenuOpen(false)}>
-                  <Upload size={14} />Enviar Peça
+                <Link href="/enviar" className="flex items-center gap-2 px-1 py-3 font-mono text-xs uppercase tracking-[0.18em] text-vermillion" onClick={() => setMenuOpen(false)}>
+                  <Upload size={13} strokeWidth={1.5} />Enviar Peça →
                 </Link>
               )}
             </nav>
